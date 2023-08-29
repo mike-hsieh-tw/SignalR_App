@@ -1,0 +1,83 @@
+﻿<h1>SignalR + Vue3 即時回報進度百分比教學</h1>
+
+<div id="app" class="container">
+    <button type="button" class="btn btn-primary" v-on:click="StartProgress()">開始執行</button>
+    <hr />
+    執行進度 {{progress}} %
+    <div class="progress">
+        <div class="progress-bar" role="progressbar" v-bind:style="'width: ' + progress + '%'" v-bind:aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    執行結果: {{message}}
+</div>
+
+@section scripts{
+    <script src="~/js/signalr/dist/browser/signalr.js"></script>
+    <script>
+    const app = Vue.createApp({
+        data() {
+            return {
+                progress:'0'
+                , message: ''
+                , hub:{   
+                    connection: {}
+                    , HubConnId: ''
+                }
+            }
+        }
+        , created() {
+            var self = this;
+
+             self.hub.connection = new signalR.HubConnectionBuilder().withUrl("/progressHub").build();
+
+            //與Server建立連線
+            self.hub.connection.start().then(function () {
+                console.log("連線完成");
+            }).catch(function (err) {
+                alert('連線錯誤: ' + err.toString());
+            });
+
+            // 連線ID
+            self.hub.connection.on("SetHubConnId", function (id) {
+                self.hub.HubConnId = id;
+            });
+
+             // 更新進度
+            self.hub.connection.on("UpdProgress", function (percent) {
+                self.progress = percent;
+            });
+        }
+        , methods: {
+            // 開始執行
+            StartProgress() {
+	            var self = this;
+
+	            // 組合表單資料
+	            var postData = {};
+	            postData['HubConnId'] = self.hub.HubConnId;
+
+                self.progress = '0';
+                self.message = '';
+
+	            // 使用 jQuery Ajax 傳送至後端
+	            $.ajax({
+		            url: '@Url.Content("~/Home/StartProgress")',
+		            method: 'POST',
+		            dataType: 'json',
+		            data: { inModel: postData, __RequestVerificationToken: $('@Html.AntiForgeryToken()').val() },
+		            success: function (datas) {
+			            if (datas.ErrMsg) {
+				            alert(datas.ErrMsg);
+				            return;
+			            }
+                        self.message = datas.ResultMsg;
+		            },
+		            error: function (err) {
+			            alert(err.status + " " + err.statusText + '\n' + err.responseText);
+		            }
+	            });
+            }
+        }
+    });
+    const vm = app.mount('#app');
+    </script>
+}
